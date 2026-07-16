@@ -1,0 +1,28 @@
+name: streamdet
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - matplotlib
+  - tqdm
+  - ffmpeg
+  - pip
+  - pip:
+      - av
+      - spectrum
+      - accelerate
+      - qwen-vl-utils
+      # torch via pip wheels (bundle CUDA, build on driverless login
+      # nodes). The extra index pins the wheel variant: bare PyPI ships
+      # the NEWEST CUDA build, which can outrun the cluster driver (torch
+      # imports but cuda.is_available()=False). +cu wheels also run fine on
+      # CPU nodes, so one env serves mixed clusters.
+      - --extra-index-url https://download.pytorch.org/whl/cu126
+      - torch
+      - torchvision
+      - transformers
+      - datasets
