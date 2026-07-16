@@ -3,14 +3,21 @@
 Reference implementation for "Detect-as-It-Streams: Anytime, Compute-Adaptive
 Detection of AI-Generated Video from the Compressed Bitstream".
 
-Each module in this package is a runnable stage of the pipeline (see README.md
-for the end-to-end reproduction). They import one another as siblings, so this
-__init__ puts the package directory on sys.path.
+Subpackages, each a stage of the pipeline (see README.md for the end-to-end
+reproduction; every stage module is runnable with `python -m`):
 
-External dependency: the VidAudit toolkit supplies the codec motion-vector
-feature extractor (the 13-d TemporalSpec feature), the audited leave-one-
-generator-out protocol, and the detector zoo (CLIP, Ivy-xDetector). Install it,
-or point VIDAUDIT_PATH at a checkout:
+    streamdet.features    codec motion vectors / pixel embeddings -> per-chunk features
+    streamdet.scoring     leave-one-generator-out readouts (streaming and clip-level)
+    streamdet.escalation  stage-2 VLM scoring
+    streamdet.analysis    anytime curves, cascade/deferral, motion-bias, paper numbers
+    streamdet.data        cell manifests and censuses
+    streamdet.bench       latency / MACs measurement
+    streamdet.metrics     NumPy streaming metrics + synthetic proofs of the theory
+
+External dependency: a third-party codec-forensics toolkit ("VidAudit") supplies
+the motion-vector feature extractor (the 13-d spectral feature), the audited
+leave-one-generator-out protocol, and the detector zoo (CLIP, Ivy-xDetector).
+Install it, or point VIDAUDIT_PATH at a checkout:
 
     export VIDAUDIT_PATH=/path/to/vidaudit
 """
@@ -20,12 +27,7 @@ import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
-# Sibling modules (e.g. `import streamdet_metrics`, `from analyze_streaming
-# import score_matrix`) resolve against the package directory.
-if _HERE not in sys.path:
-    sys.path.insert(0, _HERE)
-
-# Optional checkout of the VidAudit toolkit, if it is not already importable.
+# Optional checkout of the third-party toolkit, if it is not already importable.
 _VIDAUDIT = os.environ.get("VIDAUDIT_PATH")
 if _VIDAUDIT and os.path.isdir(_VIDAUDIT) and _VIDAUDIT not in sys.path:
     sys.path.insert(0, _VIDAUDIT)
