@@ -244,14 +244,18 @@ def chart_row(fig, mv_bottom):
     ch_bot = 0.315
     axs = fig.add_axes(IN(0.38, ch_bot, RIGHT - 0.38, ch_top - ch_bot))
     T = 8
-    XMAX = 10.75
+    XMAX = 11.3     # data ends at 8; 8.45-11.3 is the annotation lane
+    LANE = 10.0     # lane centerline
 
     # zones: commit-generated above the gate, defer band under it
-    axs.axhspan(tau, 1.10, color=PBLUE, alpha=0.65, zorder=0)
-    axs.axhspan(tau - w, tau, color=PORANGE, alpha=0.8, zorder=0)
-    axs.axhline(tau, color=INK, ls=(0, (5, 2.4)), lw=1.0, zorder=2)
-    axs.text(XMAX - 0.15, tau + 0.055, "gate $\\tau$", fontsize=5.6,
-             color=INK, ha="right", va="bottom", zorder=8)
+    axs.fill_between([0.55, 8.45], tau, 1.22, color=PBLUE, alpha=0.65,
+                     zorder=0, lw=0)
+    axs.fill_between([0.55, 8.45], tau - w, tau, color=PORANGE, alpha=0.8,
+                     zorder=0, lw=0)
+    axs.plot([0.55, 8.45], [tau, tau], color=INK, ls=(0, (5, 2.4)),
+             lw=1.0, zorder=2, clip_on=False)
+    axs.text(0.72, tau + 0.05, "gate $\\tau$", fontsize=5.6,
+             color=INK, ha="left", va="bottom", zorder=8)
 
     glow = [pe.Stroke(linewidth=3.2, foreground="white"), pe.Normal()]
 
@@ -291,58 +295,60 @@ def chart_row(fig, mv_bottom):
                  color=BLUE, lw=0.85, zorder=7, solid_capstyle="round")
 
     # endpoint frame chips: the SAME clips, where their streams end
-    def chip(role, fidx, x, y):
+    def chip(role, fidx, x, y, zoom=0.043):
         p = DATA / f"{ROLE_FILE[role]}_f{fidx}.jpg"
         if not p.exists():
             return
         img = crop_to(mpimg.imread(p), 16 / 9)
         ab = AnnotationBbox(
-            OffsetImage(img, zoom=0.062, interpolation="lanczos"),
-            (x, y), frameon=True, pad=0.08,
-            bboxprops=dict(edgecolor=ROLE_COLOR[role], linewidth=0.8,
-                           boxstyle="round,pad=0.08", facecolor="white"))
+            OffsetImage(img, zoom=zoom, interpolation="lanczos"),
+            (x, y), frameon=True, pad=0.0,
+            bboxprops=dict(edgecolor=ROLE_COLOR[role], linewidth=0.9,
+                           boxstyle="square,pad=0.03", facecolor="none"))
         ab.zorder = 6
         axs.add_artist(ab)
 
-    # generated: the exit story lives in the commit-generated zone
-    chip("gen", 1, 3.3, 1.0)
-    axs.plot([bx + 0.14, 3.3 - 0.45], [by + 0.05, 0.995], color=GRAY,
-             lw=0.5, alpha=0.6, zorder=2)
-    axs.text(4.3, 1.058, "exit early: generated", fontsize=5.8,
-             fontweight="bold", color=BLUE, va="center", ha="left", zorder=8)
-    axs.text(4.3, 0.985, "GOP 2 $\\cdot$ CPU only", fontsize=5.0,
-             color=GRAY, va="center", ha="left", zorder=8)
 
-    # right-hand decisions column: fixed vertical slots, nothing overlaps
-    CHX = 9.55
-    chip("unc", 7, CHX, 0.88)
-    axs.text(CHX, 0.695, "defer $\\to$ GPU reasoning", fontsize=5.7,
+    # right-hand annotation lane: three uniform blocks, fixed slots
+    chip("gen", 1, LANE, 1.106)
+    axs.plot([bx + 0.42, LANE - 0.62], [by + 0.03, 1.095], color=GRAY,
+             lw=0.5, alpha=0.55, zorder=2)
+    axs.text(LANE, 0.947, "Exit early: generated", fontsize=5.6,
+             fontweight="bold", color=BLUE, va="center", ha="center",
+             zorder=8)
+    axs.text(LANE, 0.850, "GOP 2 $\\cdot$ CPU only", fontsize=4.9,
+             color=GRAY, va="center", ha="center", zorder=8)
+    chip("unc", 7, LANE, 0.679)
+    axs.plot([T + 0.14, LANE - 0.62], [u[-1], 0.69], color=GRAY,
+             lw=0.5, alpha=0.55, zorder=2)
+    axs.text(LANE, 0.520, "Defer: GPU reasoning", fontsize=5.6,
              fontweight="bold", color=DORANGE, va="center", ha="center",
              zorder=8)
-    axs.text(CHX, 0.605, "pixel CNN / VLM $\\cdot$ ${\\sim}15\\%$",
-             fontsize=5.0, color=GRAY, va="center", ha="center", zorder=8)
-    axs.plot([T + 0.12, CHX - 0.66], [u[-1], 0.88], color=GRAY,
-             lw=0.5, alpha=0.6, zorder=2)
-    chip("real", 3, CHX, 0.40)
-    axs.text(CHX, 0.215, "commit: real", fontsize=5.7,
+    axs.text(LANE, 0.423, "pixel CNN / VLM $\\cdot$ ${\\sim}15\\%$",
+             fontsize=4.9, color=GRAY, va="center", ha="center", zorder=8)
+    chip("real", 3, LANE, 0.252)
+    axs.plot([7 + 0.14, LANE - 0.62], [r[-1], 0.27], color=GRAY,
+             lw=0.5, alpha=0.55, zorder=2)
+    axs.text(LANE, 0.093, "Commit: real", fontsize=5.6,
              fontweight="bold", color=GREEN, va="center", ha="center",
              zorder=8)
-    axs.text(CHX, 0.125, "stream end $\\cdot$ CPU only", fontsize=5.0,
+    axs.text(LANE, -0.004, "stream end $\\cdot$ CPU only", fontsize=4.9,
              color=GRAY, va="center", ha="center", zorder=8)
-    axs.plot([7 + 0.12, CHX - 0.66], [r[-1], 0.40], color=GRAY,
-             lw=0.5, alpha=0.6, zorder=2)
 
     axs.set_xlim(0.55, XMAX)
-    axs.set_ylim(-0.04, 1.10)
+    axs.set_ylim(-0.06, 1.22)
     axs.set_xticks([1, 2, 4, 6, 8])
     axs.set_yticks([0, 0.5, 1.0])
     axs.set_xlabel("stream time (GOPs)", fontsize=5.8, labelpad=1.5)
+    # centre the x-label under the DATA span, not the axes+lane
+    axs.xaxis.set_label_coords((4.5 - 0.55) / (11.3 - 0.55), -0.115)
     axs.set_ylabel("running score $M_t$", fontsize=5.8, labelpad=1.5)
     axs.tick_params(labelsize=5.3, length=2, pad=1.5, color=GRAY)
     for sp in ("top", "right"):
         axs.spines[sp].set_visible(False)
     for sp in ("left", "bottom"):
         axs.spines[sp].set_color(GRAY)
+    axs.spines["bottom"].set_bounds(0.55, 8.45)
 
 
 def main():
