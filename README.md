@@ -28,11 +28,14 @@ streamdet/                   the package; every stage runs with `python -m`
     gop_features.py            codec motion vectors -> per-chunk 13-d features (stage 1)
     clip_features_from_npy.py  clip-level 13-d features from precomputed MV arrays
     pixel_chunk_features.py    stage-2 pixel arm: per-chunk CLIP ViT-B/32 embeddings
+    restrav_features.py        baseline: ReStraV (NeurIPS 2025) 21-d features per clip
   scoring/                   leave-one-generator-out readouts
     streaming_scores.py        per-chunk LOGO scoring + abstain protocol
     e1_readout.py              audited LOGO/RvR readout (the E1 positive control)
+    restrav_readout.py         baseline: LOGO readout over the ReStraV features
   escalation/                stage-2 reasoning
     vlm_scores.py              Ivy-xDetector (Qwen2.5-VL-3B) p(generated) per clip
+    vv_scores.py               baseline: VideoVeritas (ICML 2026, Qwen3-VL-8B) verdicts
   analysis/                  measurement and figures
     streaming.py               anytime AUC(t), gate calibration, stopping-time FPR, latency
     cascade.py                 deferral sweep, E[C] accounting, deferral gain (Prop. 3 / Cor. 1)
@@ -40,6 +43,9 @@ streamdet/                   the package; every stage runs with `python -m`
     motionbias.py              motion-bias control (matched + within-bin AUC)
     vlm.py                     VLM baseline + codec->VLM cascade
     paper_numbers.py           recompute every number the paper cites
+    significance.py            bootstrap CIs + paired tests (McNemar) for every
+                               decision-accuracy point; AUC@N reconciliation;
+                               aggregator ablation (max vs mean vs last)
   data/                      cells and censuses
     manifest_longform.py       long-form (length-matched) cell
     manifest_videos.py         manifest from a video tree (e.g. the cross-dataset cell)
@@ -49,7 +55,7 @@ streamdet/                   the package; every stage runs with `python -m`
     latency.py                 per-chunk wall-clock and MACs, codec vs pixel
 scripts/                     one script per stage, grouped by experiment
   e1_control/  e2_latency_accuracy/  e3e4_compute_accuracy/
-  e5_earliness/  e6_cross_dataset/  e7_ablations/  common/
+  e5_earliness/  e6_cross_dataset/  e7_ablations/  e8_baselines/  common/
 tests/
   smoke_local.py             end-to-end test on synthesized clips (no cluster, ~1 min)
 ```
@@ -124,6 +130,7 @@ Stages are ordered; later ones consume earlier outputs from `results/<stage>/`.
 | **E5** earliness | `e5_earliness/`: `manifest_longform` → `gopfeat_longform` → `stream_scores_longform` | length-matched anytime curve, stopping-time FPR |
 | **E6** cross-dataset | `e6_cross_dataset/`: `manifest_aigvd` → `gopfeat_aigvd` → `stream_scores_aigvd` | AIGVDBench replication |
 | **E7** ablations | `e7_ablations/`: `gopfeat_27k_gop{8,32}` → `stream_scores_gop{8,32}` ; `ablate_featureset` ; `motionbias` | chunk size, feature set, motion-bias control |
+| **Baselines + statistics** | `e8_baselines/`: `restrav_feat` → `restrav_readout` ; `vv_scores` ; `significance` | ReStraV and VideoVeritas as full-prefix points; CIs and paired tests (McNemar) on every decision-accuracy operating point |
 
 `common/survey_cell.sh` is a cheap read-only census of a cell. Once the stages have run:
 
