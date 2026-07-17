@@ -1,13 +1,10 @@
-"""Portrait (single-column) recomposition of the Figure-1 teaser: same real
-assets and story, stacked vertically so the figure renders on page 1 as a
-column-width float at full font size.
-
-  row 1  film strips (3 lanes x 4 GOP cells) + time arrow
-  row 2  MV quiver pair: generated (sparse) vs real (rich)
-  row 3  running-score chart + escalation chip
+"""Portrait Figure-1 teaser. Section 3 rehauled: a clean trajectory chart
+(no in-plot text) whose three curves each flow into an aligned OUTCOME CARD
+(exit early / defer to GPU reasoning / commit real), so the streaming
+decisions are the visual product. Absolute-inch grid, explicit gutters.
 
 Run: python Code/streamdet/fig1_portrait.py
-Writes figures/fig1_teaser.pdf (+ PNG preview).
+Writes Paper/ver2/fig1_teaser.pdf (+ PNG preview).
 """
 from __future__ import annotations
 
@@ -26,19 +23,22 @@ BLUE = "#0072B2"
 DORANGE = "#B87700"
 GREEN = "#009E73"
 GRAY = "#6B7280"
+PBLUE = "#EAF3F9"
 PORANGE = "#FDF0DA"
+PGREEN = "#E4F4EF"
 VERM = "#D55E00"
 
 DATA = Path("results/fig1-data")
-SPEC = json.loads(Path("figures/fig1_clips.json").read_text())
-OUT_PDF = Path("figures/fig1_teaser.pdf")
-OUT_PNG = Path("figures/fig1_preview.png")
+SPEC = json.loads(Path("Code/streamdet/fig1_clips.json").read_text())
+OUT_PDF = Path("Paper/ver2/fig1_teaser.pdf")
+OUT_PNG = Path("/private/tmp/claude-501/-Volumes-Stash-Projects-streamdet/"
+               "eb058455-0215-426e-852a-d1590f23b6f3/scratchpad/fig1_preview.png")
 
 ROLE_FILE = {"gen": "gen", "real": "real4", "unc": "unc1"}
 ROLE_LABEL = {"gen": "generated", "real": "real", "unc": "uncertain"}
 ROLE_COLOR = {"gen": BLUE, "real": GREEN, "unc": DORANGE}
 
-FIG_W, FIG_H = 3.32, 3.62
+FIG_W, FIG_H = 3.32, 3.92
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -49,12 +49,31 @@ plt.rcParams.update({
     "text.color": INK,
 })
 
+LEFT, RIGHT = 0.10, 3.22
+CELL_H = 0.27
+
+
+def IN(x, y, w, h):
+    return [x / FIG_W, y / FIG_H, w / FIG_W, h / FIG_H]
+
+
+def TX(x, y):
+    return x / FIG_W, y / FIG_H
+
 
 def traj(role):
     key = ROLE_FILE[role]
     for c in SPEC["clips"]:
         if c["role"] == key:
             return np.array(c["running_max"], float)
+    raise KeyError(role)
+
+
+def raw(role):
+    key = ROLE_FILE[role]
+    for c in SPEC["clips"]:
+        if c["role"] == key:
+            return np.array(c.get("scores", c["running_max"]), float)
     raise KeyError(role)
 
 
@@ -79,7 +98,7 @@ def mv_crop(gx, gy, aspect):
 
 
 def quiver_panel(ax, frame_path, npz_path, gop_key, aspect,
-                 keep_frac=0.22, step=2, scale=18):
+                 keep_frac=0.22, step=2, scale=40):
     img = crop_to(mpimg.imread(frame_path), aspect)
     ax.imshow(img, interpolation="lanczos", alpha=0.94)
     mv = np.load(npz_path)
@@ -100,165 +119,237 @@ def quiver_panel(ax, frame_path, npz_path, gop_key, aspect,
     ax.set_yticks([])
 
 
+def section_header(fig, y, num, title, sub=None):
+    fig.text(*TX((LEFT + RIGHT) / 2, y), f"{num}  {title}", ha="center",
+             va="center", fontsize=6.8, fontweight="bold", color=INK)
+    if sub:
+        fig.text(*TX((LEFT + RIGHT) / 2, y - 0.115), sub, ha="center",
+                 va="center", fontsize=5.6, color=GRAY)
+
+
+# ------------------------------------------------------------- section 1
 def strip_row(fig):
-    x0, cell_w, gap = 0.075, 0.212, 0.012
-    lane_y = {"gen": 0.842, "real": 0.748, "unc": 0.654}
-    lane_h = 0.086
-    for role in ("gen", "real", "unc"):
-        y0 = lane_y[role]
+    section_header(fig, 3.80, "1", "video arrives as compressed GOPs")
+    n, gapx = 4, 0.045
+    cell_w = (RIGHT - LEFT - (n - 1) * gapx) / n
+    lane_tops = {"gen": 3.67, "real": 3.35, "unc": 3.03}
+    aspect = cell_w / CELL_H
+    for role, ytop in lane_tops.items():
+        y0 = ytop - CELL_H
         pref = ROLE_FILE[role]
         slots = [0, 1] if role == "gen" else [0, 1, 2, 3]
-        cell_aspect = (cell_w * FIG_W) / (lane_h * FIG_H)
         for k in slots:
-            ax = fig.add_axes([x0 + k * (cell_w + gap), y0, cell_w, lane_h])
-            p = DATA / f"{pref}_f{k}.jpg"
-            ax.imshow(crop_to(mpimg.imread(p), cell_aspect), aspect="auto",
-                      interpolation="lanczos")
+            ax = fig.add_axes(IN(LEFT + k * (cell_w + gapx), y0, cell_w,
+                                 CELL_H))
+            ax.imshow(crop_to(mpimg.imread(DATA / f"{pref}_f{k}.jpg"), aspect),
+                      aspect="auto", interpolation="lanczos")
             ax.set_xticks([])
             ax.set_yticks([])
             for s in ax.spines.values():
                 s.set_edgecolor(ROLE_COLOR[role])
                 s.set_linewidth(0.9)
             if k == 0:
-                ax.text(0.035, 0.82, ROLE_LABEL[role],
-                        transform=ax.transAxes, fontsize=5.2,
+                ax.text(0.05, 0.80, ROLE_LABEL[role],
+                        transform=ax.transAxes, fontsize=5.3,
                         fontweight="bold", color="white",
-                        bbox=dict(boxstyle="round,pad=0.22",
+                        bbox=dict(boxstyle="round,pad=0.25",
                                   fc=ROLE_COLOR[role], ec="none"), zorder=5)
         if role == "gen":
-            axe = fig.add_axes([x0 + 2 * (cell_w + gap), y0,
-                                2 * cell_w + gap, lane_h])
-            axe.set_facecolor("#F4F5F7")
-            axe.set_xticks([])
-            axe.set_yticks([])
-            for s in axe.spines.values():
+            ax = fig.add_axes(IN(LEFT + 2 * (cell_w + gapx), y0,
+                                 2 * cell_w + gapx, CELL_H))
+            ax.set_facecolor("#F4F5F7")
+            ax.set_xticks([])
+            ax.set_yticks([])
+            for s in ax.spines.values():
                 s.set_edgecolor("#B9C0C9")
                 s.set_linewidth(0.7)
                 s.set_linestyle((0, (2.5, 2.5)))
-            axe.text(0.5, 0.5, "stream ends (generated clips run short)",
-                     ha="center", va="center", fontsize=5.0, color=GRAY,
-                     style="italic", transform=axe.transAxes)
-    total_w = 4 * cell_w + 3 * gap
-    ar = FancyArrowPatch((x0, 0.636), (x0 + total_w, 0.636),
+            ax.text(0.5, 0.5, "stream ends\n(generated clips run short)",
+                    ha="center", va="center", fontsize=5.2, color=GRAY,
+                    style="italic", transform=ax.transAxes, linespacing=1.4)
+    ay = lane_tops["unc"] - CELL_H - 0.09
+    ar = FancyArrowPatch(TX(LEFT, ay), TX(RIGHT, ay),
                          transform=fig.transFigure, arrowstyle="-|>",
                          mutation_scale=7, lw=0.8, color=GRAY)
     fig.add_artist(ar)
-    fig.text(x0 + total_w / 2, 0.614, "stream time (one cell per GOP)",
-             ha="center", color=GRAY, fontsize=5.4)
-    fig.text(x0 + total_w / 2, 0.985, "video arrives as compressed GOPs",
-             ha="center", va="top", fontsize=6.6, color=INK,
-             fontweight="bold")
+    fig.text(*TX((LEFT + RIGHT) / 2, ay - 0.075),
+             "stream time (one cell per GOP)", ha="center", color=GRAY,
+             fontsize=5.6)
+    return ay - 0.075
 
 
-def mv_row(fig):
-    y0, h = 0.388, 0.158
-    w_p = 0.435
-    x_g, x_r = 0.075, 0.075 + w_p + 0.028
-    aspect = (w_p * FIG_W) / (h * FIG_H)
-    axg = fig.add_axes([x_g, y0, w_p, h])
+# ------------------------------------------------------------- section 2
+def mv_row(fig, top):
+    hy = top - 0.14
+    section_header(fig, hy, "2", "the encoder already computed motion",
+                   "a CPU parse: ${\\sim}10^5$ MACs/GOP, no pixel-domain "
+                   "forward pass $\\to$ score $s_t$")
+    p_h, gapx = 0.545, 0.10
+    p_w = (RIGHT - LEFT - gapx) / 2
+    y0 = hy - 0.115 - 0.09 - p_h
+    aspect = p_w / p_h
+    axg = fig.add_axes(IN(LEFT, y0, p_w, p_h))
     quiver_panel(axg, DATA / "gen_f1.jpg", DATA / "gen_mv.npz", "g1", aspect,
-                 keep_frac=0.10, scale=40)
+                 keep_frac=0.10)
     for s in axg.spines.values():
         s.set_edgecolor(BLUE)
         s.set_linewidth(1.0)
-    axg.text(0.03, 0.85, "generated: sparse motion", transform=axg.transAxes,
-             fontsize=5.2, fontweight="bold", color="white",
-             bbox=dict(boxstyle="round,pad=0.22", fc=BLUE, ec="none"),
+    axg.text(0.04, 0.86, "generated: sparse motion",
+             transform=axg.transAxes, fontsize=5.3, fontweight="bold",
+             color="white",
+             bbox=dict(boxstyle="round,pad=0.25", fc=BLUE, ec="none"),
              zorder=5)
-    axr = fig.add_axes([x_r, y0, w_p, h])
+    axr = fig.add_axes(IN(LEFT + p_w + gapx, y0, p_w, p_h))
     quiver_panel(axr, DATA / "real4_f1.jpg", DATA / "real4_mv.npz", "g1",
-                 aspect, keep_frac=0.14, scale=40)
+                 aspect, keep_frac=0.14)
     for s in axr.spines.values():
         s.set_edgecolor(GREEN)
         s.set_linewidth(1.0)
-    axr.text(0.03, 0.85, "real: rich motion", transform=axr.transAxes,
-             fontsize=5.2, fontweight="bold", color="white",
-             bbox=dict(boxstyle="round,pad=0.22", fc=GREEN, ec="none"),
+    axr.text(0.04, 0.86, "real: rich motion", transform=axr.transAxes,
+             fontsize=5.3, fontweight="bold", color="white",
+             bbox=dict(boxstyle="round,pad=0.25", fc=GREEN, ec="none"),
              zorder=5)
-    fig.text(0.5, 0.598, "the encoder already computed motion",
-             ha="center", va="top", fontsize=6.6, fontweight="bold",
-             color=INK)
-    fig.text(0.5, 0.572, "a CPU parse: ${\\sim}10^5$ MACs/GOP, no pixel-domain "
-             "forward pass $\\to$ score $s_t$",
-             ha="center", va="top", fontsize=5.4, color=GRAY)
+    return y0
 
 
-def chart_row(fig):
+# ------------------------------------------------------------- section 3
+def chart_row(fig, mv_bottom):
+    import matplotlib.patheffects as pe
+    from matplotlib.lines import Line2D
+    from matplotlib.offsetbox import AnnotationBbox, OffsetImage
     tau, w = float(SPEC["tau"]), float(SPEC["width"])
-    cx, cy, c_w, c_h = 0.115, 0.085, 0.60, 0.235
-    axs = fig.add_axes([cx, cy, c_w, c_h])
+    hy = mv_bottom - 0.14
+    fig.text(*TX((LEFT + RIGHT) / 2, hy),
+             "3  one monotone score, three decisions",
+             ha="center", va="center", fontsize=6.8, fontweight="bold",
+             color=INK)
+
+    # legend strip: line-style key lives BETWEEN title and chart, never on data
+    ly = hy - 0.135
+    cx = (LEFT + RIGHT) / 2
+    x0 = cx - 0.80
+    fig.add_artist(Line2D([TX(x0, ly)[0], TX(x0 + 0.17, ly)[0]],
+                          [TX(x0, ly)[1]] * 2, transform=fig.transFigure,
+                          color=INK, lw=2.0, solid_capstyle="round"))
+    fig.text(*TX(x0 + 0.215, ly), "running max $M_t$", fontsize=5.2,
+             color=INK, va="center", ha="left")
+    x1 = cx + 0.12
+    fig.add_artist(Line2D([TX(x1, ly)[0], TX(x1 + 0.17, ly)[0]],
+                          [TX(x1, ly)[1]] * 2, transform=fig.transFigure,
+                          color=INK, lw=0.8, ls=(0, (2.2, 1.6)), alpha=0.8))
+    fig.text(*TX(x1 + 0.215, ly), "per-GOP score $s_t$", fontsize=5.2,
+             color=GRAY, va="center", ha="left")
+
+    ch_top = hy - 0.20
+    ch_bot = 0.315
+    axs = fig.add_axes(IN(0.38, ch_bot, RIGHT - 0.38, ch_top - ch_bot))
     T = 8
-    axs.axhspan(tau - w, tau, color=PORANGE, zorder=0)
-    axs.axhline(tau, color=GRAY, ls="--", lw=0.8, zorder=1)
-    axs.text(1.0, tau + 0.03, r"$\tau$", fontsize=6.8, color=GRAY,
-             ha="center", va="bottom")
-    axs.text(T - 0.1, tau - w / 2, "defer band", fontsize=5.2,
-             color=DORANGE, ha="right", va="center")
-    for role in ("gen", "real", "unc"):
-        v = traj(role)[:T]
-        axs.plot(np.arange(1, len(v) + 1), v, color=ROLE_COLOR[role],
-                 lw=1.5, marker="o", ms=1.9, zorder=3, clip_on=False)
+    XMAX = 10.75
+
+    # zones: commit-generated above the gate, defer band under it
+    axs.axhspan(tau, 1.10, color=PBLUE, alpha=0.65, zorder=0)
+    axs.axhspan(tau - w, tau, color=PORANGE, alpha=0.8, zorder=0)
+    axs.axhline(tau, color=INK, ls=(0, (5, 2.4)), lw=1.0, zorder=2)
+    axs.text(XMAX - 0.15, tau + 0.055, "gate $\\tau$", fontsize=5.6,
+             color=INK, ha="right", va="bottom", zorder=8)
+
+    glow = [pe.Stroke(linewidth=3.2, foreground="white"), pe.Normal()]
+
+    def series(role, color, upto=None, z=4):
+        s_raw = raw(role)
+        m = traj(role)
+        n = min(len(s_raw), len(m), T) if upto is None else upto
+        t = np.arange(1, n + 1)
+        # the raw per-GOP signal: thin dashed trace beneath the envelope
+        axs.plot(t, s_raw[:n], color=color, lw=0.8, ls=(0, (2.2, 1.6)),
+                 alpha=0.55, marker="o", ms=1.6, mfc="white", mew=0.5,
+                 zorder=z, clip_on=False)
+        # the running-max envelope: a true staircase riding the signal
+        axs.plot(t, m[:n], color=color, lw=2.1, zorder=z + 1,
+                 drawstyle="steps-post", path_effects=glow, clip_on=False,
+                 solid_capstyle="round")
+        axs.plot(t, m[:n], color=color, lw=0, marker="o", ms=2.3,
+                 zorder=z + 1, clip_on=False)
+        return m, n
+
     g = traj("gen")
     cross = int(np.argmax(g >= tau)) + 1
-    axs.plot([cross], [g[cross - 1]], marker="o", ms=5.6, mfc="none",
-             mec=BLUE, mew=1.4, zorder=4)
-    axs.annotate("exit: generated (GOP 2)", xy=(cross + 0.12, g[cross - 1] - 0.03),
-                 xytext=(cross + 0.75, 0.60), fontsize=5.4, color=BLUE,
-                 fontweight="bold", va="top", ha="left",
-                 arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=0.8,
-                                 shrinkA=1, shrinkB=2,
-                                 connectionstyle="arc3,rad=0.25"))
-    r = traj("real")[:T]
-    axs.annotate("commit real (stream end)", xy=(T - 0.5, r[-1] - 0.035),
-                 xytext=(2.4, 0.13), fontsize=5.4, color=GREEN, va="center",
-                 arrowprops=dict(arrowstyle="-|>", color=GREEN, lw=0.8,
-                                 connectionstyle="arc3,rad=-0.2"))
-    axs.set_xlabel("prefix observed (GOPs)", fontsize=5.8, labelpad=1)
-    axs.set_ylabel(r"running score $M_t$", fontsize=5.8, labelpad=1)
-    axs.set_xlim(0.7, T + 0.3)
-    axs.set_ylim(-0.03, 1.03)
-    axs.set_xticks([1, 4, 8])
-    axs.set_yticks([0, 0.5, 1])
-    axs.tick_params(labelsize=5.4, length=2, pad=1)
+    series("gen", BLUE, upto=cross, z=5)
+    u, _ = series("unc", DORANGE)
+    r, _ = series("real", GREEN)
+    u = u[:T]
+    r = r[:T]
+
+    # gate-firing burst at the generated crossing
+    bx, by = cross, g[cross - 1]
+    axs.plot([bx], [by], marker="o", ms=7.0, mfc="white", mec=BLUE,
+             mew=1.5, zorder=7)
+    axs.plot([bx], [by], marker="o", ms=2.8, mfc=BLUE, mec="none", zorder=7)
+    for ang in np.linspace(0, 2 * np.pi, 8, endpoint=False):
+        axs.plot([bx + 0.20 * np.cos(ang), bx + 0.34 * np.cos(ang)],
+                 [by + 0.055 * np.sin(ang), by + 0.095 * np.sin(ang)],
+                 color=BLUE, lw=0.85, zorder=7, solid_capstyle="round")
+
+    # endpoint frame chips: the SAME clips, where their streams end
+    def chip(role, fidx, x, y):
+        p = DATA / f"{ROLE_FILE[role]}_f{fidx}.jpg"
+        if not p.exists():
+            return
+        img = crop_to(mpimg.imread(p), 16 / 9)
+        ab = AnnotationBbox(
+            OffsetImage(img, zoom=0.062, interpolation="lanczos"),
+            (x, y), frameon=True, pad=0.08,
+            bboxprops=dict(edgecolor=ROLE_COLOR[role], linewidth=0.8,
+                           boxstyle="round,pad=0.08", facecolor="white"))
+        ab.zorder = 6
+        axs.add_artist(ab)
+
+    # generated: the exit story lives in the commit-generated zone
+    chip("gen", 1, 3.3, 1.0)
+    axs.plot([bx + 0.14, 3.3 - 0.45], [by + 0.05, 0.995], color=GRAY,
+             lw=0.5, alpha=0.6, zorder=2)
+    axs.text(4.3, 1.058, "exit early: generated", fontsize=5.8,
+             fontweight="bold", color=BLUE, va="center", ha="left", zorder=8)
+    axs.text(4.3, 0.985, "GOP 2 $\\cdot$ CPU only", fontsize=5.0,
+             color=GRAY, va="center", ha="left", zorder=8)
+
+    # right-hand decisions column: fixed vertical slots, nothing overlaps
+    CHX = 9.55
+    chip("unc", 7, CHX, 0.88)
+    axs.text(CHX, 0.695, "defer $\\to$ GPU reasoning", fontsize=5.7,
+             fontweight="bold", color=DORANGE, va="center", ha="center",
+             zorder=8)
+    axs.text(CHX, 0.605, "pixel CNN / VLM $\\cdot$ ${\\sim}15\\%$",
+             fontsize=5.0, color=GRAY, va="center", ha="center", zorder=8)
+    axs.plot([T + 0.12, CHX - 0.66], [u[-1], 0.88], color=GRAY,
+             lw=0.5, alpha=0.6, zorder=2)
+    chip("real", 3, CHX, 0.40)
+    axs.text(CHX, 0.215, "commit: real", fontsize=5.7,
+             fontweight="bold", color=GREEN, va="center", ha="center",
+             zorder=8)
+    axs.text(CHX, 0.125, "stream end $\\cdot$ CPU only", fontsize=5.0,
+             color=GRAY, va="center", ha="center", zorder=8)
+    axs.plot([7 + 0.12, CHX - 0.66], [r[-1], 0.40], color=GRAY,
+             lw=0.5, alpha=0.6, zorder=2)
+
+    axs.set_xlim(0.55, XMAX)
+    axs.set_ylim(-0.04, 1.10)
+    axs.set_xticks([1, 2, 4, 6, 8])
+    axs.set_yticks([0, 0.5, 1.0])
+    axs.set_xlabel("stream time (GOPs)", fontsize=5.8, labelpad=1.5)
+    axs.set_ylabel("running score $M_t$", fontsize=5.8, labelpad=1.5)
+    axs.tick_params(labelsize=5.3, length=2, pad=1.5, color=GRAY)
     for sp in ("top", "right"):
         axs.spines[sp].set_visible(False)
-    fig.text(cx + c_w / 2 + 0.12, 0.368,
-             "one monotone score, one threshold, anytime-valid (Prop. 2)",
-             ha="center", va="top", fontsize=6.4, fontweight="bold",
-             color=INK)
-
-    ex, ey, e_w, e_h = 0.745, 0.140, 0.235, 0.15
-    chip = FancyBboxPatch((ex, ey), e_w, e_h,
-                          boxstyle="round,pad=0.006,rounding_size=0.010",
-                          transform=fig.transFigure, fc=PORANGE, ec=DORANGE,
-                          lw=0.9)
-    fig.add_artist(chip)
-    fig.text(ex + e_w / 2, ey + e_h - 0.014, "reasoning on demand",
-             ha="center", va="top", fontsize=5.3, fontweight="bold",
-             color=DORANGE)
-    fig.text(ex + e_w / 2, ey + e_h - 0.052,
-             "pixel CNN / small VLM\nGPU $\\cdot$ ${\\sim}15\\%$",
-             ha="center", va="top", fontsize=5.4, color=INK, linespacing=1.4)
-    u = traj("unc")[:8]
-    y_end = cy + c_h * (u[-1] + 0.03) / 1.06
-    ar3 = FancyArrowPatch((cx + c_w + 0.004, y_end), (ex - 0.002, ey + e_h / 2),
-                          transform=fig.transFigure, arrowstyle="-|>",
-                          mutation_scale=8, lw=1.2, color=DORANGE,
-                          connectionstyle="arc3,rad=-0.25")
-    fig.add_artist(ar3)
-    fig.text(ex + e_w / 2, ey - 0.018, "verdict", ha="center", va="top",
-             fontsize=5.6, color=INK, fontweight="bold")
-    ar4 = FancyArrowPatch((ex + e_w / 2, ey - 0.002), (ex + e_w / 2, ey - 0.016),
-                          transform=fig.transFigure, arrowstyle="-|>",
-                          mutation_scale=6, lw=0.8, color=DORANGE)
-    fig.add_artist(ar4)
+    for sp in ("left", "bottom"):
+        axs.spines[sp].set_color(GRAY)
 
 
 def main():
     fig = plt.figure(figsize=(FIG_W, FIG_H), dpi=300)
-    strip_row(fig)
-    mv_row(fig)
-    chart_row(fig)
+    bottom1 = strip_row(fig)
+    bottom2 = mv_row(fig, bottom1)
+    chart_row(fig, bottom2)
     fig.savefig(OUT_PDF)
     fig.savefig(OUT_PNG, dpi=240)
     print("wrote", OUT_PDF, "and preview")
