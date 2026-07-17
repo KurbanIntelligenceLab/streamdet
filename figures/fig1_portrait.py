@@ -38,7 +38,7 @@ ROLE_FILE = {"gen": "gen", "real": "real4", "unc": "unc1"}
 ROLE_LABEL = {"gen": "generated", "real": "real", "unc": "uncertain"}
 ROLE_COLOR = {"gen": BLUE, "real": GREEN, "unc": DORANGE}
 
-FIG_W, FIG_H = 3.32, 4.50
+FIG_W, FIG_H = 3.32, 4.22
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -171,7 +171,7 @@ def _overlay_bg(fig):
     return fig._ovlbg
 
 
-def section_header(fig, y, num, title, sub=None):
+def section_header(fig, y, num, title, sub=None, left=False):
     import matplotlib.font_manager as fm
     from matplotlib.patches import Circle
     cx = (LEFT + RIGHT) / 2
@@ -184,11 +184,13 @@ def section_header(fig, y, num, title, sub=None):
            else {"fontsize": 8.0, "fontweight": "bold"})
     dkw = ({"fontproperties": fm.FontProperties(fname=hp, size=7.0)} if hp
            else {"fontsize": 7.0, "fontweight": "bold"})
-    # measure the title so the badge+title pair can be centred as a unit
+    # measure the title so the badge+title pair can be laid out as a unit
     ttl = fig.text(*TX(cx, y), title, ha="left", va="center", color=INK, **tkw)
     fig.canvas.draw()
     tw_in = ttl.get_window_extent(ren).width / fig.bbox.width * FIG_W
-    startx = cx - (2 * R + GAP + tw_in) / 2
+    # left-aligned (keeps the header clear of a right-hand card column) or
+    # centred as a unit
+    startx = LEFT if left else cx - (2 * R + GAP + tw_in) / 2
     bx = startx + R
     ov.add_patch(Circle((bx, y), R, facecolor=INK, edgecolor="none",
                         zorder=13))
@@ -197,17 +199,18 @@ def section_header(fig, y, num, title, sub=None):
             zorder=14, **dkw)
     ttl.set_position(TX(startx + 2 * R + GAP, y))
     if sub:
-        fig.text(*TX(cx, y - 0.145), sub, ha="center",
+        sx, sha = (startx + 2 * R + GAP, "left") if left else (cx, "center")
+        fig.text(*TX(sx, y - 0.145), sub, ha=sha,
                  va="center", fontsize=5.5, color=GRAY, style="italic")
 
 
 # ------------------------------------------------------------- section 1
 def strip_row(fig):
-    section_header(fig, 4.34, "1", "Video Arrives as Compressed GOPs",
+    section_header(fig, 4.055, "1", "Video Arrives as Compressed GOPs",
                    "one cell per group-of-pictures, in decode order")
     n, gapx = 4, 0.045
     cell_w = (RIGHT - LEFT - (n - 1) * gapx) / n
-    lane_tops = {"gen": 4.095, "real": 3.775, "unc": 3.455}
+    lane_tops = {"gen": 3.810, "real": 3.490, "unc": 3.170}
     aspect = cell_w / CELL_H
     for role, ytop in lane_tops.items():
         y0 = ytop - CELL_H
@@ -289,8 +292,8 @@ def strip_row(fig):
 def mv_row(fig, top):
     hy = top - 0.125
     section_header(fig, hy, "2", "The Encoder Already Computed Motion",
-                   "a CPU parse: ${\\sim}10^5$ MACs/GOP, no pixel-domain "
-                   "forward pass $\\to$ score $s_t$")
+                   "a CPU parse of ${\\sim}10^5$ MACs per GOP, no pixel "
+                   "forward pass, gives score $s_t$")
     p_h, gapx = 0.42, 0.10
     p_w = (RIGHT - LEFT - gapx) / 2
     y0 = hy - 0.115 - 0.09 - p_h
@@ -327,26 +330,13 @@ def chart_row(fig, mv_bottom):
     tau, w = float(SPEC["tau"]), float(SPEC["width"])
     hy = mv_bottom - 0.185
     section_header(fig, hy, "3", "One Monotone Score, Three Decisions",
-                   "aggregate to a running max; gate once, at the end")
+                   "take the running max, then gate once at the end",
+                   left=True)
 
-    # legend strip: line-style key lives BETWEEN title and chart, never on data
-    ly = hy - 0.290
-    cx = (LEFT + RIGHT) / 2
-    x0 = cx - 0.80
-    fig.add_artist(Line2D([TX(x0, ly)[0], TX(x0 + 0.17, ly)[0]],
-                          [TX(x0, ly)[1]] * 2, transform=fig.transFigure,
-                          color=INK, lw=2.0, solid_capstyle="round"))
-    fig.text(*TX(x0 + 0.215, ly), "running max $M_t$", fontsize=5.2,
-             color=INK, va="center", ha="left")
-    x1 = cx + 0.12
-    fig.add_artist(Line2D([TX(x1, ly)[0], TX(x1 + 0.17, ly)[0]],
-                          [TX(x1, ly)[1]] * 2, transform=fig.transFigure,
-                          color=INK, lw=1.2, ls=(0, (2.4, 1.5)), alpha=0.85))
-    fig.text(*TX(x1 + 0.215, ly), "per-GOP score $s_t$", fontsize=5.2,
-             color=GRAY, va="center", ha="left")
-
-    ch_top = hy - 0.350
-    ch_bot = 0.600     # plot raised: leaves room below for the taller card column
+    # legend strip: line-style key lives BELOW the graph, centred under the
+    # plot's data span (drawn later, once ch_bot is known)
+    ch_top = hy - 0.225
+    ch_bot = 0.420     # plot sits low; cards are decoupled onto the overlay
     YLO, YHI = -0.07, 1.12          # chart data y-range (also the card frame)
     axs = fig.add_axes(IN(0.38, ch_bot, RIGHT - 0.38, ch_top - ch_bot))
     T = 8
@@ -396,28 +386,30 @@ def chart_row(fig, mv_bottom):
     u = u[:T]
     r = r[:T]
 
-    # gate-firing marker at the generated crossing: a single clean star
-    # (marker glyphs render in point-space, so they stay symmetric regardless
-    # of the axes aspect)
+    # gate-firing marker at the generated crossing: a clean "detection pulse"
+    # bullseye, drawn on the INCH overlay so the rings are truly circular
+    from matplotlib.patches import Circle
     bx, by = cross, g[cross - 1]
-    axs.plot([bx], [by], marker="*", ms=15, mfc=BLUE, mec="white", mew=1.1,
-             zorder=8, clip_on=False)
+    ovg = _overlay(fig)
+    ix = 0.38 + (bx - 0.55) / (XMAX - 0.55) * (RIGHT - 0.38)
+    iy = ch_bot + (by - YLO) / (YHI - YLO) * (ch_top - ch_bot)
+    ovg.add_patch(Circle((ix, iy), 0.066, facecolor=BLUE, alpha=0.12,
+                         edgecolor="none", zorder=7.5))
+    ovg.add_patch(Circle((ix, iy), 0.046, facecolor="white", edgecolor=BLUE,
+                         linewidth=1.6, zorder=7.7))
+    ovg.add_patch(Circle((ix, iy), 0.018, facecolor=BLUE, edgecolor="none",
+                         zorder=7.9))
 
-    # frame chips: image and border share ONE extent -- centred by
-    # construction (no offsetbox alignment quirks), sized in inches
+    # OUTCOME CARDS: a fixed right-hand column drawn on the INCH overlay,
+    # DECOUPLED from the plot -- so the chart can sit low (no white gap below)
+    # without dragging the taller card column off the figure.
     from matplotlib.patches import Rectangle
-    # everything below is sized in INCHES then mapped to data units through
-    # dx/dy, so the stack keeps its physical size at ANY chart height and can
-    # never silently drift when the layout above changes
-    dx = (XMAX - 0.55) / (RIGHT - 0.38)        # data units per inch, x
-    dy = (YHI - YLO) / (ch_top - ch_bot)       # data units per inch, y
+    ov = _overlay(fig)
+    CARD_X = 2.90                              # column centre, inches
     W_IN = 0.52                                # chip width on paper (inches)
     CH_IN = W_IN * 9 / 16                       # chip height (16:9)
     TAG_IN, SUB_IN = 0.082, 0.078              # measured text-line heights
-    GCT_IN, GTS_IN, GBLK_IN = 0.026, 0.012, 0.030
-    CW, CH = W_IN * dx, CH_IN * dy
-    TAG_H, SUB_H = TAG_IN * dy, SUB_IN * dy
-    G_CT, G_TS, G_BLK = GCT_IN * dy, GTS_IN * dy, GBLK_IN * dy
+    GCT_IN, GTS_IN, GBLK_IN = 0.028, 0.014, 0.058
     block_in = CH_IN + GCT_IN + TAG_IN + GTS_IN + SUB_IN
     stack_in = 3 * block_in + 2 * GBLK_IN
     blocks = [
@@ -428,30 +420,37 @@ def chart_row(fig, mv_bottom):
         ("real", 3, GREEN, "$\\bf{Commit\\!:}$ real",
          "stream end $\\cdot$ CPU only", (7 + 0.14, r[-1])),
     ]
-    # anchor the stack just under the chart top and let it run down into the
-    # bottom lane margin (the stack is taller than the compact plot)
-    free = (ch_top - ch_bot) - stack_in
-    yc = YHI - (max(free / 2, 0.0) + 0.020) * dy
-    for role, fidx, col, tag, sub, (lx0, ly0) in blocks:
-        cy = yc - CH / 2
+
+    def d2ix(xd):
+        return 0.38 + (xd - 0.55) / (XMAX - 0.55) * (RIGHT - 0.38)
+
+    def d2iy(yd):
+        return ch_bot + (yd - YLO) / (YHI - YLO) * (ch_top - ch_bot)
+
+    yc = (ch_top + ch_bot) / 2 + stack_in / 2 + 0.035   # centre on the plot,
+    #                                                   nudged up for edge room
+    for role, fidx, col, tag, sub, (exd, eyd) in blocks:
+        fcy = yc - CH_IN / 2
         img = crop_to(mpimg.imread(DATA / f"{ROLE_FILE[role]}_f{fidx}.jpg"),
                       16 / 9)
-        im = axs.imshow(img, extent=[LANE - CW / 2, LANE + CW / 2,
-                                     cy - CH / 2, cy + CH / 2],
-                        aspect="auto", interpolation="lanczos", zorder=6)
-        im.set_clip_on(False)   # the lane may run below the axes box
-        axs.add_patch(Rectangle((LANE - CW / 2, cy - CH / 2), CW, CH,
-                                fill=False, edgecolor=col, lw=1.0, zorder=7,
-                                clip_on=False))
-        axs.plot([lx0, LANE - CW / 2 - 0.06], [ly0, cy], color=GRAY,
-                 lw=0.5, alpha=0.55, zorder=2)
-        ty = cy - CH / 2 - G_CT - TAG_H / 2
-        axs.text(LANE, ty, tag, fontsize=5.1, color=col,
-                 va="center", ha="center", zorder=8)
-        sy = ty - TAG_H / 2 - G_TS - SUB_H / 2
-        axs.text(LANE, sy, sub, fontsize=4.5, color=GRAY,
-                 va="center", ha="center", zorder=8)
-        yc = sy - SUB_H / 2 - G_BLK
+        ov.imshow(img, extent=[CARD_X - W_IN / 2, CARD_X + W_IN / 2,
+                               fcy - CH_IN / 2, fcy + CH_IN / 2],
+                  aspect="auto", interpolation="lanczos", zorder=13)
+        ov.add_patch(Rectangle((CARD_X - W_IN / 2, fcy - CH_IN / 2), W_IN,
+                               CH_IN, fill=False, edgecolor=col, lw=1.0,
+                               zorder=13.5))
+        # the top card's leader arrives from below-left: attach it to the
+        # card's LOWER-left corner so it passes under the section subtitle
+        end_y = fcy - CH_IN / 2 + 0.02 if role == "gen" else fcy
+        ov.plot([d2ix(exd), CARD_X - W_IN / 2 - 0.05], [d2iy(eyd), end_y],
+                color=GRAY, lw=0.5, alpha=0.55, zorder=11)
+        ty = fcy - CH_IN / 2 - GCT_IN - TAG_IN / 2
+        ov.text(CARD_X, ty, tag, fontsize=5.1, color=col, va="center",
+                ha="center", zorder=13.5)
+        sy = ty - TAG_IN / 2 - GTS_IN - SUB_IN / 2
+        ov.text(CARD_X, sy, sub, fontsize=4.5, color=GRAY, va="center",
+                ha="center", zorder=13.5)
+        yc = sy - SUB_IN / 2 - GBLK_IN
 
     axs.set_xlim(0.55, XMAX)
     axs.set_ylim(-0.07, 1.12)
@@ -467,6 +466,22 @@ def chart_row(fig, mv_bottom):
     for sp in ("left", "bottom"):
         axs.spines[sp].set_color(GRAY)
     axs.spines["bottom"].set_bounds(0.55, 8.45)
+
+    # line-style legend BELOW the graph, centred under the plotted data span
+    ly = 0.135
+    LC = 0.38 + (4.5 - 0.55) / (XMAX - 0.55) * (RIGHT - 0.38)
+    x0 = LC - 0.83
+    fig.add_artist(Line2D([TX(x0, ly)[0], TX(x0 + 0.17, ly)[0]],
+                          [TX(x0, ly)[1]] * 2, transform=fig.transFigure,
+                          color=INK, lw=2.0, solid_capstyle="round"))
+    fig.text(*TX(x0 + 0.215, ly), "running max $M_t$", fontsize=5.2,
+             color=INK, va="center", ha="left")
+    x1 = LC + 0.10
+    fig.add_artist(Line2D([TX(x1, ly)[0], TX(x1 + 0.17, ly)[0]],
+                          [TX(x1, ly)[1]] * 2, transform=fig.transFigure,
+                          color=INK, lw=1.2, ls=(0, (2.4, 1.5)), alpha=0.85))
+    fig.text(*TX(x1 + 0.215, ly), "per-GOP score $s_t$", fontsize=5.2,
+             color=GRAY, va="center", ha="left")
 
 
 def main():
