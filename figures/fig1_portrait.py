@@ -38,7 +38,7 @@ ROLE_FILE = {"gen": "gen", "real": "real4", "unc": "unc1"}
 ROLE_LABEL = {"gen": "generated", "real": "real", "unc": "uncertain"}
 ROLE_COLOR = {"gen": BLUE, "real": GREEN, "unc": DORANGE}
 
-FIG_W, FIG_H = 3.32, 4.60
+FIG_W, FIG_H = 3.32, 4.50
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -203,11 +203,11 @@ def section_header(fig, y, num, title, sub=None):
 
 # ------------------------------------------------------------- section 1
 def strip_row(fig):
-    section_header(fig, 4.44, "1", "Video Arrives as Compressed GOPs",
+    section_header(fig, 4.34, "1", "Video Arrives as Compressed GOPs",
                    "one cell per group-of-pictures, in decode order")
     n, gapx = 4, 0.045
     cell_w = (RIGHT - LEFT - (n - 1) * gapx) / n
-    lane_tops = {"gen": 4.195, "real": 3.875, "unc": 3.555}
+    lane_tops = {"gen": 4.095, "real": 3.775, "unc": 3.455}
     aspect = cell_w / CELL_H
     for role, ytop in lane_tops.items():
         y0 = ytop - CELL_H
@@ -346,7 +346,7 @@ def chart_row(fig, mv_bottom):
              color=GRAY, va="center", ha="left")
 
     ch_top = hy - 0.350
-    ch_bot = 0.315
+    ch_bot = 0.600     # plot raised: leaves room below for the taller card column
     YLO, YHI = -0.07, 1.12          # chart data y-range (also the card frame)
     axs = fig.add_axes(IN(0.38, ch_bot, RIGHT - 0.38, ch_top - ch_bot))
     T = 8
@@ -396,24 +396,12 @@ def chart_row(fig, mv_bottom):
     u = u[:T]
     r = r[:T]
 
-    # gate-firing marker at the generated crossing. Drawn on the INCH overlay
-    # so the rays are truly circular (in data coords the non-square axes would
-    # squash them into a lopsided ellipse).
-    from matplotlib.patches import Circle
+    # gate-firing marker at the generated crossing: a single clean star
+    # (marker glyphs render in point-space, so they stay symmetric regardless
+    # of the axes aspect)
     bx, by = cross, g[cross - 1]
-    ovb = _overlay(fig)
-    ix = 0.38 + (bx - 0.55) / (XMAX - 0.55) * (RIGHT - 0.38)
-    iy = ch_bot + (by - YLO) / (YHI - YLO) * (ch_top - ch_bot)
-    ovb.add_patch(Circle((ix, iy), 0.072, facecolor=BLUE, alpha=0.10,
-                         edgecolor="none", zorder=7.4))
-    for a in np.linspace(0, 2 * np.pi, 12, endpoint=False):
-        ovb.plot([ix + 0.052 * np.cos(a), ix + 0.080 * np.cos(a)],
-                 [iy + 0.052 * np.sin(a), iy + 0.080 * np.sin(a)],
-                 color=BLUE, lw=1.0, solid_capstyle="round", zorder=7.6)
-    ovb.add_patch(Circle((ix, iy), 0.040, facecolor="white", edgecolor=BLUE,
-                         linewidth=1.5, zorder=7.7))
-    ovb.add_patch(Circle((ix, iy), 0.017, facecolor=BLUE, edgecolor="none",
-                         zorder=7.8))
+    axs.plot([bx], [by], marker="*", ms=15, mfc=BLUE, mec="white", mew=1.1,
+             zorder=8, clip_on=False)
 
     # frame chips: image and border share ONE extent -- centred by
     # construction (no offsetbox alignment quirks), sized in inches
@@ -440,10 +428,10 @@ def chart_row(fig, mv_bottom):
         ("real", 3, GREEN, "$\\bf{Commit\\!:}$ real",
          "stream end $\\cdot$ CPU only", (7 + 0.14, r[-1])),
     ]
-    # centre the stack vertically in the chart's data range, then nudge the
-    # whole stack DOWN a little for a better optical balance with the curves
+    # anchor the stack just under the chart top and let it run down into the
+    # bottom lane margin (the stack is taller than the compact plot)
     free = (ch_top - ch_bot) - stack_in
-    yc = YHI - (max(free / 2, 0.0) + 0.075) * dy
+    yc = YHI - (max(free / 2, 0.0) + 0.020) * dy
     for role, fidx, col, tag, sub, (lx0, ly0) in blocks:
         cy = yc - CH / 2
         img = crop_to(mpimg.imread(DATA / f"{ROLE_FILE[role]}_f{fidx}.jpg"),
