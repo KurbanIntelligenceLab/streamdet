@@ -14,7 +14,7 @@ reproduction; every stage module is runnable with `python -m`):
     streamdet.bench       latency / MACs measurement
     streamdet.metrics     NumPy streaming metrics + synthetic proofs of the theory
 
-External dependency: a third-party codec-forensics toolkit ("VidAudit") supplies
+External dependency: our codec-forensics toolkit VidAudit supplies
 the motion-vector feature extractor (the 13-d spectral feature), the audited
 leave-one-generator-out protocol, and the detector zoo (CLIP, Ivy-xDetector).
 Install it, or point VIDAUDIT_PATH at a checkout:
@@ -27,7 +27,7 @@ import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
-# Optional checkout of the third-party toolkit, if it is not already importable.
+# Optional checkout of the VidAudit toolkit, if it is not already importable.
 _VIDAUDIT = os.environ.get("VIDAUDIT_PATH")
 if _VIDAUDIT and os.path.isdir(_VIDAUDIT) and _VIDAUDIT not in sys.path:
     sys.path.insert(0, _VIDAUDIT)

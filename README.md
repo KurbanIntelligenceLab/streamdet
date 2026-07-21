@@ -1,6 +1,6 @@
-# Detect-as-It-Streams
+# Detect Early, Escalate Rarely
 
-Reference implementation for **"Detect-as-It-Streams: Anytime, Compute-Adaptive Detection of
+Reference implementation for **"Detect Early, Escalate Rarely: Anytime Detection of
 AI-Generated Video from the Compressed Bitstream."**
 
 Detectors for AI-generated video (AIGV) are evaluated almost entirely offline: decode a whole clip
@@ -60,20 +60,15 @@ tests/
   smoke_local.py             end-to-end test on synthesized clips (no cluster, ~1 min)
 ```
 
-## Third-party dependencies
+## Companion toolkits
 
-Two external toolkits are used and are **not** included here. Both are independent projects; obtain
-them from their own distributions.
+Two of our own toolkits are used and are **not** vendored here; install them from their
+repositories.
 
 | Toolkit | What this repo uses it for | Required? |
 |---|---|---|
-| **VidAudit** — an audited benchmark/toolkit for AI-generated-video detection | The codec motion-vector feature extractor (the 13-d spectral feature over a 16×16 macroblock grid), the audited leave-one-generator-out protocol and its splits/seeds, the canonical H.264 re-encode, and the detector zoo (CLIP ViT-B/32; Ivy-xDetector). Cited in the paper as concurrent work. | **Yes** |
-| **mv-extractor** — a batch extractor for codec motion vectors | Produces the per-clip `[T, H_mb, W_mb, 5]` motion-vector `.npy` arrays (plus `frame_types.txt`) that `features/gop_features.py` consumes in its `--npy-path` input mode, and the canonical re-encode recipe those arrays assume. Only needed if you precompute MV arrays rather than decoding mp4s directly. | Optional |
-
-> **Anonymity note.** Both are third-party projects with respect to this submission; their
-> repositories are referenced in the paper as anonymized concurrent/related work, and direct links
-> are omitted here for double-blind review. They will be linked in the camera-ready. If you are a
-> reviewer and need them to reproduce, request them through the submission system.
+| **[VidAudit](https://github.com/KurbanIntelligenceLab/vidaudit)** — our audited benchmark/toolkit for AI-generated-video detection | The codec motion-vector feature extractor (the 13-d spectral feature over a 16×16 macroblock grid), the audited leave-one-generator-out protocol and its splits/seeds, the canonical H.264 re-encode, and the detector zoo (CLIP ViT-B/32; Ivy-xDetector). See [arXiv:2606.31004](https://arxiv.org/abs/2606.31004). | **Yes** |
+| **[mv-extractor](https://github.com/KurbanIntelligenceLab/mv-extractor)** — our batch extractor for codec motion vectors | Produces the per-clip `[T, H_mb, W_mb, 5]` motion-vector `.npy` arrays (plus `frame_types.txt`) that `features/gop_features.py` consumes in its `--npy-path` input mode, and the canonical re-encode recipe those arrays assume. Only needed if you precompute MV arrays rather than decoding mp4s directly. | Optional |
 
 ## Setup
 
@@ -86,15 +81,15 @@ environment and is required for the canonical re-encode path.
 conda env create -f environment.yml
 conda activate streamdet
 
-# 2. Point at the third-party toolkit (see the table above)
+# 2. Point at the VidAudit toolkit (see the table above)
 export VIDAUDIT_PATH=/path/to/vidaudit
 
 # 3. Verify the install end-to-end: synthesizes clips, runs the full stage-1
 #    pipeline, asserts the plumbing. ~1 min on CPU.
 PYTHONPATH="$PWD" python tests/smoke_local.py
 
-# 4. Verify the theory. Self-contained (NumPy only); proves Propositions 1-3
-#    and Corollary 1 by assertion on synthetic data.
+# 4. Verify the theory. Self-contained (NumPy only); checks the anytime-validity,
+#    cascade-compute and budget-frontier results by assertion on synthetic data.
 PYTHONPATH="$PWD" python -m streamdet.metrics    # must print ALL SMOKE TESTS PASSED
 ```
 
@@ -105,7 +100,7 @@ We do not redistribute source clips. Bring your own:
 * **GenVidBench** — the matched comparison cell (7 generators + 2 real sources).
 * **AIGVDBench** — the cross-dataset replication (E6).
 
-Both are prepared through the third-party toolkit's canonical H.264 re-encode (`crf 23`, closed GOP
+Both are prepared through the VidAudit toolkit's canonical H.264 re-encode (`crf 23`, closed GOP
 16), which normalizes the codec fingerprints the motion-vector features read; it also emits the
 matched subset CSV and the clip-level feature table that E1 reproduces.
 
@@ -156,8 +151,23 @@ PYTHONPATH="$PWD" python -m streamdet.analysis.paper_numbers --results results
 * **Seeds.** Principal numbers are leave-one-generator-out means at seed 42 with percentile
   bootstrap intervals.
 
+## Citation
+
+```bibtex
+@misc{cakiroglu2026detectearly,
+  title        = {Detect Early, Escalate Rarely: Anytime Detection of {AI}-Generated Video
+                  from the Compressed Bitstream},
+  author       = {Mert Onur Cakiroglu and Mehmet Dalkilic and Hasan Kurban},
+  year         = {2026},
+  eprint       = {TODO-arxiv-id},
+  archivePrefix= {arXiv},
+  primaryClass = {cs.CV}
+}
+```
+
+<!-- Replace TODO-arxiv-id once the identifier is assigned, and add the abs URL. -->
+
 ## License
 
 MIT (see `LICENSE`). The escalation checkpoints carry their own licenses: CLIP ViT-B/32 (OpenAI) and
-Ivy-xDetector (Qwen2.5-VL-3B base, Qwen Research License, non-commercial). The third-party toolkits
-above are licensed by their respective authors.
+Ivy-xDetector (Qwen2.5-VL-3B base, Qwen Research License, non-commercial). The two companion toolkits above are MIT-licensed.
