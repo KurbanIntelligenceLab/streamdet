@@ -152,16 +152,17 @@ PYTHONPATH="$PWD" python -m streamdet.analysis.paper_numbers --results results
   bootstrap intervals.
 
 ## Citation
+If you find this work useful please cite:
 
 ```bibtex
 @misc{cakiroglu2026detectearly,
-  title        = {Detect Early, Escalate Rarely: Anytime Detection of {AI}-Generated Video
-                  from the Compressed Bitstream},
-  author       = {Mert Onur Cakiroglu and Mehmet Dalkilic and Hasan Kurban},
-  year         = {2026},
-  eprint       = {TODO-arxiv-id},
-  archivePrefix= {arXiv},
-  primaryClass = {cs.CV}
+      title={Detect Early, Escalate Rarely: Anytime Detection of AI-Generated Video from the Compressed Bitstream}, 
+      author={Mert Onur Cakiroglu and Mehmet Dalkilic and Hasan Kurban},
+      year={2026},
+      eprint={2607.19476},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2607.19476},
 }
 ```
 
