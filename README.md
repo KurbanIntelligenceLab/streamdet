@@ -162,7 +162,7 @@ If you find this work useful please cite:
       eprint={2607.19476},
       archivePrefix={arXiv},
       primaryClass={cs.CV},
-      url={https://arxiv.org/abs/2607.19476},
+      url={https://arxiv.org/abs/2607.19476}, 
 }
 ```
 
